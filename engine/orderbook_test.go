@@ -28,8 +28,6 @@ func TestNewOrderBook(t *testing.T) {
 // TestOrderBookBestPrices tests the BestBid and BestAsk methods
 func TestOrderBookBestPrices(t *testing.T) {
 	ob := NewOrderBook("BTC-USDT")
-	tradeCh := make(chan Trade, 10)
-	fillCh := make(chan OrderFill, 10)
 
 	// Add a buy order
 	buyOrder := Order{
@@ -39,6 +37,8 @@ func TestOrderBookBestPrices(t *testing.T) {
 		Qty:   decimal.NewFromFloat(1.0),
 		Time:  time.Now().Unix(),
 	}
+	tradeCh := make(chan Trade, 10)
+	fillCh := make(chan OrderFill, 10)
 	ob.Match(buyOrder, tradeCh, fillCh, buyOrder.Qty)
 
 	// Add a sell order
@@ -49,6 +49,8 @@ func TestOrderBookBestPrices(t *testing.T) {
 		Qty:   decimal.NewFromFloat(1.0),
 		Time:  time.Now().Unix(),
 	}
+	tradeCh = make(chan Trade, 10)
+	fillCh = make(chan OrderFill, 10)
 	ob.Match(sellOrder, tradeCh, fillCh, sellOrder.Qty)
 
 	// Check best prices
@@ -64,8 +66,6 @@ func TestOrderBookBestPrices(t *testing.T) {
 // TestOrderBookMatching tests the order matching functionality
 func TestOrderBookMatching(t *testing.T) {
 	ob := NewOrderBook("BTC-USDT")
-	tradeCh := make(chan Trade, 10)
-	fillCh := make(chan OrderFill, 10)
 
 	// Add a sell order first
 	sellOrder := Order{
@@ -75,10 +75,9 @@ func TestOrderBookMatching(t *testing.T) {
 		Qty:   decimal.NewFromFloat(1.0),
 		Time:  time.Now().Unix(),
 	}
+	tradeCh := make(chan Trade, 10)
+	fillCh := make(chan OrderFill, 10)
 	ob.Match(sellOrder, tradeCh, fillCh, sellOrder.Qty)
-
-	// Drain the fill channel
-	<-fillCh
 
 	// Add a matching buy order
 	buyOrder := Order{
@@ -88,6 +87,8 @@ func TestOrderBookMatching(t *testing.T) {
 		Qty:   decimal.NewFromFloat(1.0),
 		Time:  time.Now().Unix(),
 	}
+	tradeCh = make(chan Trade, 10)
+	fillCh = make(chan OrderFill, 10)
 	ob.Match(buyOrder, tradeCh, fillCh, buyOrder.Qty)
 
 	// Check that a trade was generated
@@ -123,8 +124,6 @@ func TestOrderBookMatching(t *testing.T) {
 // TestPartialFill tests partial order filling
 func TestPartialFill(t *testing.T) {
 	ob := NewOrderBook("BTC-USDT")
-	tradeCh := make(chan Trade, 10)
-	fillCh := make(chan OrderFill, 10)
 
 	// Add a large sell order
 	sellOrder := Order{
@@ -134,10 +133,9 @@ func TestPartialFill(t *testing.T) {
 		Qty:   decimal.NewFromFloat(5.0),
 		Time:  time.Now().Unix(),
 	}
+	tradeCh := make(chan Trade, 10)
+	fillCh := make(chan OrderFill, 10)
 	ob.Match(sellOrder, tradeCh, fillCh, sellOrder.Qty)
-
-	// Drain the fill channel
-	<-fillCh
 
 	// Add a smaller buy order
 	buyOrder := Order{
@@ -147,6 +145,8 @@ func TestPartialFill(t *testing.T) {
 		Qty:   decimal.NewFromFloat(2.0),
 		Time:  time.Now().Unix(),
 	}
+	tradeCh = make(chan Trade, 10)
+	fillCh = make(chan OrderFill, 10)
 	ob.Match(buyOrder, tradeCh, fillCh, buyOrder.Qty)
 
 	// Check trade
@@ -168,8 +168,6 @@ func TestPartialFill(t *testing.T) {
 // TestMultiplePriceLevels tests orders at different price levels
 func TestMultiplePriceLevels(t *testing.T) {
 	ob := NewOrderBook("BTC-USDT")
-	tradeCh := make(chan Trade, 10)
-	fillCh := make(chan OrderFill, 10)
 
 	// Add buy orders at different prices
 	buyOrder1 := Order{
@@ -179,6 +177,8 @@ func TestMultiplePriceLevels(t *testing.T) {
 		Qty:   decimal.NewFromFloat(1.0),
 		Time:  time.Now().Unix(),
 	}
+	tradeCh := make(chan Trade, 10)
+	fillCh := make(chan OrderFill, 10)
 	ob.Match(buyOrder1, tradeCh, fillCh, buyOrder1.Qty)
 
 	buyOrder2 := Order{
@@ -188,6 +188,8 @@ func TestMultiplePriceLevels(t *testing.T) {
 		Qty:   decimal.NewFromFloat(1.0),
 		Time:  time.Now().Unix(),
 	}
+	tradeCh = make(chan Trade, 10)
+	fillCh = make(chan OrderFill, 10)
 	ob.Match(buyOrder2, tradeCh, fillCh, buyOrder2.Qty)
 
 	// Best bid should be the higher price
@@ -203,6 +205,8 @@ func TestMultiplePriceLevels(t *testing.T) {
 		Qty:   decimal.NewFromFloat(1.0),
 		Time:  time.Now().Unix(),
 	}
+	tradeCh = make(chan Trade, 10)
+	fillCh = make(chan OrderFill, 10)
 	ob.Match(sellOrder1, tradeCh, fillCh, sellOrder1.Qty)
 
 	sellOrder2 := Order{
@@ -212,6 +216,8 @@ func TestMultiplePriceLevels(t *testing.T) {
 		Qty:   decimal.NewFromFloat(1.0),
 		Time:  time.Now().Unix(),
 	}
+	tradeCh = make(chan Trade, 10)
+	fillCh = make(chan OrderFill, 10)
 	ob.Match(sellOrder2, tradeCh, fillCh, sellOrder2.Qty)
 
 	// Best ask should be the lower price
@@ -223,8 +229,6 @@ func TestMultiplePriceLevels(t *testing.T) {
 // TestGetBidDepth tests the bid depth functionality
 func TestGetBidDepth(t *testing.T) {
 	ob := NewOrderBook("BTC-USDT")
-	tradeCh := make(chan Trade, 10)
-	fillCh := make(chan OrderFill, 10)
 
 	// Add multiple buy orders at same price
 	buyOrder1 := Order{
@@ -234,6 +238,8 @@ func TestGetBidDepth(t *testing.T) {
 		Qty:   decimal.NewFromFloat(1.0),
 		Time:  time.Now().Unix(),
 	}
+	tradeCh := make(chan Trade, 10)
+	fillCh := make(chan OrderFill, 10)
 	ob.Match(buyOrder1, tradeCh, fillCh, buyOrder1.Qty)
 
 	buyOrder2 := Order{
@@ -243,6 +249,8 @@ func TestGetBidDepth(t *testing.T) {
 		Qty:   decimal.NewFromFloat(2.0),
 		Time:  time.Now().Unix(),
 	}
+	tradeCh = make(chan Trade, 10)
+	fillCh = make(chan OrderFill, 10)
 	ob.Match(buyOrder2, tradeCh, fillCh, buyOrder2.Qty)
 
 	// Add buy order at different price
@@ -253,6 +261,8 @@ func TestGetBidDepth(t *testing.T) {
 		Qty:   decimal.NewFromFloat(1.5),
 		Time:  time.Now().Unix(),
 	}
+	tradeCh = make(chan Trade, 10)
+	fillCh = make(chan OrderFill, 10)
 	ob.Match(buyOrder3, tradeCh, fillCh, buyOrder3.Qty)
 
 	// Test depth
@@ -276,8 +286,6 @@ func TestGetBidDepth(t *testing.T) {
 // TestGetAskDepth tests the ask depth functionality
 func TestGetAskDepth(t *testing.T) {
 	ob := NewOrderBook("BTC-USDT")
-	tradeCh := make(chan Trade, 10)
-	fillCh := make(chan OrderFill, 10)
 
 	// Add multiple sell orders
 	sellOrder1 := Order{
@@ -287,6 +295,8 @@ func TestGetAskDepth(t *testing.T) {
 		Qty:   decimal.NewFromFloat(1.0),
 		Time:  time.Now().Unix(),
 	}
+	tradeCh := make(chan Trade, 10)
+	fillCh := make(chan OrderFill, 10)
 	ob.Match(sellOrder1, tradeCh, fillCh, sellOrder1.Qty)
 
 	sellOrder2 := Order{
@@ -296,6 +306,8 @@ func TestGetAskDepth(t *testing.T) {
 		Qty:   decimal.NewFromFloat(2.0),
 		Time:  time.Now().Unix(),
 	}
+	tradeCh = make(chan Trade, 10)
+	fillCh = make(chan OrderFill, 10)
 	ob.Match(sellOrder2, tradeCh, fillCh, sellOrder2.Qty)
 
 	// Test depth
@@ -328,8 +340,6 @@ func TestEmptyDepth(t *testing.T) {
 // TestInvalidDepth tests depth methods with invalid parameters
 func TestInvalidDepth(t *testing.T) {
 	ob := NewOrderBook("BTC-USDT")
-	tradeCh := make(chan Trade, 10)
-	fillCh := make(chan OrderFill, 10)
 
 	// Add an order
 	order := Order{
@@ -339,6 +349,8 @@ func TestInvalidDepth(t *testing.T) {
 		Qty:   decimal.NewFromFloat(1.0),
 		Time:  time.Now().Unix(),
 	}
+	tradeCh := make(chan Trade, 10)
+	fillCh := make(chan OrderFill, 10)
 	ob.Match(order, tradeCh, fillCh, order.Qty)
 
 	// Test with invalid depth parameters
@@ -389,8 +401,6 @@ func TestOrderFillEvents(t *testing.T) {
 // TestOrderFillAtTopPriceSell tests that SELL orders are filled at the top BUY price, not SELL order price
 func TestOrderFillAtTopPriceSell(t *testing.T) {
 	ob := NewOrderBook("BTC-USDT")
-	tradeCh := make(chan Trade, 10)
-	fillCh := make(chan OrderFill, 10)
 
 	// Add a buy order at the top price
 	buyOrder := Order{
@@ -400,7 +410,8 @@ func TestOrderFillAtTopPriceSell(t *testing.T) {
 		Qty:   decimal.NewFromFloat(1),
 		Time:  time.Now().Unix(),
 	}
-
+	tradeCh := make(chan Trade, 10)
+	fillCh := make(chan OrderFill, 10)
 	ob.Match(buyOrder, tradeCh, fillCh, buyOrder.Qty)
 
 	// Skip the NEW fill event for BUY-1
@@ -413,7 +424,8 @@ func TestOrderFillAtTopPriceSell(t *testing.T) {
 		Qty:   decimal.NewFromFloat(1),
 		Time:  time.Now().Unix(),
 	}
-
+	tradeCh = make(chan Trade, 10)
+	fillCh = make(chan OrderFill, 10)
 	ob.Match(sellOrder, tradeCh, fillCh, sellOrder.Qty)
 
 	for i := 0; i < 2; i++ {
@@ -457,8 +469,6 @@ func TestOrderFillAtTopPriceSell(t *testing.T) {
 // TestOrderFillAtTopPriceBuy tests that BUY orders are filled at the BOTTOM SELL price, not BUY order price
 func TestOrderFillAtTopPriceBuy(t *testing.T) {
 	ob := NewOrderBook("BTC-USDT")
-	tradeCh := make(chan Trade, 10)
-	fillCh := make(chan OrderFill, 10)
 
 	sellOrder := Order{
 		ID:    "SELL-1",
@@ -467,7 +477,8 @@ func TestOrderFillAtTopPriceBuy(t *testing.T) {
 		Qty:   decimal.NewFromFloat(1),
 		Time:  time.Now().Unix(),
 	}
-
+	tradeCh := make(chan Trade, 10)
+	fillCh := make(chan OrderFill, 10)
 	ob.Match(sellOrder, tradeCh, fillCh, sellOrder.Qty)
 
 	// Skip the NEW fill event for SELL-1
@@ -480,7 +491,8 @@ func TestOrderFillAtTopPriceBuy(t *testing.T) {
 		Qty:   decimal.NewFromFloat(1),
 		Time:  time.Now().Unix(),
 	}
-
+	tradeCh = make(chan Trade, 10)
+	fillCh = make(chan OrderFill, 10)
 	ob.Match(buyOrder, tradeCh, fillCh, buyOrder.Qty)
 
 	for i := 0; i < 2; i++ {
