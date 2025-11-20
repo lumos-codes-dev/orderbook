@@ -11,6 +11,7 @@ A high-performance order matching engine with real-time market data streaming ca
 - **Real-time trade execution** - Price-time priority matching algorithm
 - **Live market data streaming** - Continuous price updates and depth streaming
 - **Order fill tracking** - Comprehensive order status updates
+- **Order cancellation** - Ability to cancel active orders and receive cancellation updates
 - **Trade statistics** - Real-time analytics and trade metrics
 - **Thread-safe operations** - Concurrent access support across multiple trading pairs
 - **High-performance matching** - Heap-based data structures for O(log n) operations
@@ -62,25 +63,25 @@ import (
 func main() {
     // Create new engine
     e := engine.NewEngine()
-    
+
     // Start real-time data streams
     e.StartPriceBroadcaster()
     e.StartDepthStreamer(10)
-    
+
     // Listen for trades
     go func() {
         for trade := range e.TradeStream {
             fmt.Printf("Trade: %+v\n", trade)
         }
     }()
-    
+
     // Listen for fills
     go func() {
         for fill := range e.FillStream {
             fmt.Printf("Fill: %+v\n", fill)
         }
     }()
-    
+
     // Add orders
     buyOrder := engine.Order{
         ID:    "buy1",
@@ -89,7 +90,7 @@ func main() {
         Qty:   decimal.NewFromFloat(0.1),
         Time:  time.Now().Unix(),
     }
-    
+
     sellOrder := engine.Order{
         ID:    "sell1",
         Side:  engine.Sell,
@@ -97,15 +98,23 @@ func main() {
         Qty:   decimal.NewFromFloat(0.1),
         Time:  time.Now().Unix(),
     }
-    
+
     // Process orders (will generate trade since prices match)
     e.AddOrder("BTC-USD", sellOrder)
     e.AddOrder("BTC-USD", buyOrder)
-    
+
     // Get market depth
     depth := e.GetOrderBookDepth("BTC-USD", 5)
     if depth != nil {
         fmt.Printf("Market Depth: %+v\n", depth)
+    }
+
+    // Cancel an existing order
+    cancelSuccess := e.CancelOrder("BTC-USD", "buy1")
+    if cancelSuccess {
+        fmt.Println("Order buy1 was successfully cancelled")
+    } else {
+        fmt.Println("Order buy1 could not be cancelled")
     }
 }
 ```
@@ -173,6 +182,7 @@ The test suite covers:
 - ✅ Order processing and matching
 - ✅ Trade generation and statistics
 - ✅ Fill event generation
+- ✅ Order cancelation
 - ✅ Price update broadcasting
 - ✅ Depth streaming
 - ✅ Concurrent order processing
@@ -233,11 +243,13 @@ Code quality is automatically enforced via GitHub Actions on every push and pull
 ### Local Development Setup
 
 1. **Install tools:**
+
    ```bash
    make install-tools
    ```
 
 2. **Format and check code before committing:**
+
    ```bash
    make check
    ```
@@ -257,6 +269,7 @@ The project includes comprehensive godoc documentation for all public APIs.
 #### Viewing Documentation
 
 1. **Start the godoc server:**
+
    ```bash
    godoc -http=:6060
    ```
@@ -265,13 +278,14 @@ The project includes comprehensive godoc documentation for all public APIs.
    Open http://localhost:6060/pkg/orderbook/engine/
 
 3. **Command line documentation:**
+
    ```bash
    # View package documentation
    go doc ./engine
-   
+
    # View all documentation
    go doc -all ./engine
-   
+
    # View specific type/function
    go doc ./engine.Engine
    go doc ./engine.NewEngine
@@ -429,7 +443,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 │ │  Processing │ │    │                 │    │  Depth          │
 │ └─────────────┘ │    │ ┌─────────────┐ │    │                 │
 │                 │    │ │  Bid Heap   │ │    └─────────────────┘
-│ ┌─────────────┐ │    │ │  Ask Heap   │ │    
+│ ┌─────────────┐ │    │ │  Ask Heap   │ │
 │ │  Statistics │ │    │ │  Matching   │ │    ┌─────────────────┐
 │ │  Tracking   │ │    │ └─────────────┘ │    │   External      │
 │ └─────────────┘ │    └─────────────────┘    │   Consumers     │
@@ -438,4 +452,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
                                               │  Risk Mgmt      │
                                               │  Settlement     │
                                               └─────────────────┘
-``` 
+```
