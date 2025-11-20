@@ -74,9 +74,6 @@ func BenchmarkWithRandomData(benchmark *testing.B) {
 		time.Sleep(100 * time.Millisecond)
 	}
 
-	close(tradeCh)
-	close(fillCh)
-
 	// Run garbage collection after each benchmark run to clean up memory
 	runtime.GC()
 
