@@ -165,8 +165,33 @@ func (e *Engine) AddOrder(pair string, order Order) {
 
 	originalQty := order.Qty
 	book.Match(order, tradeCh, fillCh, originalQty)
-	close(tradeCh)
-	close(fillCh)
+}
+
+// CancelOrder cancels an existing order in the specified trading pair. If the order
+// exists and has remaining quantity, it will be removed from the order book and a
+// cancel fill event will be sent through the FillStream.
+func (e *Engine) CancelOrder(pair string, orderId string) bool {
+	book, exists := e.books[pair]
+	if !exists {
+		return false
+	}
+
+	fillCh := make(chan OrderFill, 1)
+
+	success := book.Cancel(orderId, fillCh)
+
+	if success {
+		go func() {
+			select {
+			case fill := <-fillCh:
+				e.FillStream <- fill
+			case <-time.After(100 * time.Millisecond):
+				// Timeout if channel not ready
+			}
+		}()
+	}
+
+	return success
 }
 
 // StartPriceBroadcaster starts a background goroutine that continuously broadcasts

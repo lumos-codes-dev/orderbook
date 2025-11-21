@@ -62,10 +62,11 @@ func (h askHeap) Less(i, j int) bool {
 // It maintains orders in price-time priority using heap data structures for efficient
 // matching and provides methods for order execution and market data retrieval.
 type OrderBook struct {
-	Pair  string     // Trading pair identifier (e.g., "BTC-USD")
-	bids  *bidHeap   // Buy orders heap (max-heap by price)
-	asks  *askHeap   // Sell orders heap (min-heap by price)
-	mutex sync.Mutex // Protects concurrent access to the order book
+	Pair   string            // Trading pair identifier (e.g., "BTC-USD")
+	bids   *bidHeap          // Buy orders heap (max-heap by price)
+	asks   *askHeap          // Sell orders heap (min-heap by price)
+	orders map[string]*Order // map of orders
+	mutex  sync.Mutex        // Protects concurrent access to the order book
 }
 
 // NewOrderBook creates and initializes a new order book for the specified trading pair.
@@ -75,7 +76,12 @@ func NewOrderBook(pair string) *OrderBook {
 	a := &askHeap{}
 	heap.Init(b)
 	heap.Init(a)
-	return &OrderBook{Pair: pair, bids: b, asks: a}
+	return &OrderBook{
+		Pair:   pair,
+		bids:   b,
+		asks:   a,
+		orders: make(map[string]*Order),
+	}
 }
 
 // Match processes an incoming order against the order book, executing trades when possible.
@@ -99,22 +105,34 @@ func (ob *OrderBook) Match(order Order, tradeCh chan<- Trade, fillCh chan<- Orde
 	ob.mutex.Lock()
 	defer ob.mutex.Unlock()
 
+	// Set the original quantity on the order
+	order.OriginalQty = originalQty
+
+	// Track the order in the orders map
+	ob.orders[order.ID] = &order
+
 	now := time.Now().Unix()
 	incomingExecutedQty := decimal.Zero
 
 	if order.Side == Buy {
+		// Loop through asks to match the incoming BUY order
 		for ob.asks.Len() > 0 && !order.Qty.IsZero() {
+			// Take the best-priced ask (lowest price)
 			top := heap.Pop(ob.asks).(*Order)
+
+			// If the best ask price is higher than the buy price, stop matching
 			if top.Price.GreaterThan(order.Price) {
 				heap.Push(ob.asks, top)
 				break
 			}
+
+			// Determine how much quantity can be executed in this trade
 			qty := min(order.Qty, top.Qty)
 			if qty.IsZero() {
 				continue
 			}
 
-			// Create trade
+			// Create a trade for matched quantity
 			tradeCh <- Trade{
 				Pair:        ob.Pair,
 				BuyOrderID:  order.ID,
@@ -123,27 +141,29 @@ func (ob *OrderBook) Match(order Order, tradeCh chan<- Trade, fillCh chan<- Orde
 				Qty:         qty,
 			}
 
-			// Update quantities
+			// Update remaining quantities for both orders
 			order.Qty = order.Qty.Sub(qty)
 			top.Qty = top.Qty.Sub(qty)
 			incomingExecutedQty = incomingExecutedQty.Add(qty)
 
-			// Create fill event for the matched sell order (top)
+			// Determine status of the matched SELL order
 			topStatus := PartiallyFilled
 			if top.Qty.IsZero() {
 				topStatus = Filled
 			}
 
+			// Determine status of the incoming BUY order
 			orderStatus := PartiallyFilled
 			if order.Qty.IsZero() {
 				orderStatus = Filled
 			}
 
+			// write fill event for the matched SELL order (top of the ask heap)
 			fillCh <- OrderFill{
 				OrderID:      top.ID,
 				Pair:         ob.Pair,
 				Side:         top.Side,
-				OriginalQty:  top.Qty.Add(qty), // Reconstruct original qty
+				OriginalQty:  top.OriginalQty,
 				ExecutedQty:  qty,
 				RemainingQty: top.Qty,
 				Price:        top.Price,
@@ -152,11 +172,12 @@ func (ob *OrderBook) Match(order Order, tradeCh chan<- Trade, fillCh chan<- Orde
 				Timestamp:    now,
 			}
 
+			// write fill event for the incoming BUY order
 			fillCh <- OrderFill{
 				OrderID:      order.ID,
 				Pair:         ob.Pair,
 				Side:         order.Side,
-				OriginalQty:  order.Qty.Add(qty), // Reconstruct original qty
+				OriginalQty:  order.OriginalQty,
 				ExecutedQty:  qty,
 				RemainingQty: order.Qty,
 				Price:        top.Price,
@@ -165,27 +186,41 @@ func (ob *OrderBook) Match(order Order, tradeCh chan<- Trade, fillCh chan<- Orde
 				Timestamp:    now,
 			}
 
+			// If the SELL order still has remaining quantity, push it back to heap
 			if !top.Qty.IsZero() {
 				heap.Push(ob.asks, top)
+			} else {
+				// Remove fully filled order from the orders map
+				delete(ob.orders, top.ID)
 			}
 		}
 
+		// If BUY order is not fully filled, push the remaining quantity into bids heap
 		if !order.Qty.IsZero() {
 			heap.Push(ob.bids, &order)
+		} else {
+			// Remove fully filled order from the orders map
+			delete(ob.orders, order.ID)
 		}
 	} else {
+		// Loop through bids to match the incoming SELL order
 		for ob.bids.Len() > 0 && !order.Qty.IsZero() {
+			// Take the best-priced bid (highest price)
 			top := heap.Pop(ob.bids).(*Order)
+
+			// If the best bid price is lower than the sell price, stop matching
 			if top.Price.LessThan(order.Price) {
-				heap.Push(ob.bids, top)
+				heap.Push(ob.bids, top) // push it back since it can't be matched
 				break
 			}
+
+			// Determine how much quantity can be executed in this trade
 			qty := min(order.Qty, top.Qty)
 			if qty.IsZero() {
-				continue
+				continue // skip if no executable quantity
 			}
 
-			// Create trade
+			// Create a trade for matched quantity
 			tradeCh <- Trade{
 				Pair:        ob.Pair,
 				BuyOrderID:  top.ID,
@@ -194,27 +229,29 @@ func (ob *OrderBook) Match(order Order, tradeCh chan<- Trade, fillCh chan<- Orde
 				Qty:         qty,
 			}
 
-			// Update quantities
+			// Update remaining quantities for both orders
 			order.Qty = order.Qty.Sub(qty)
 			top.Qty = top.Qty.Sub(qty)
 			incomingExecutedQty = incomingExecutedQty.Add(qty)
 
-			// Create fill event for the matched buy order (top)
+			// Determine status of the matched BUY order
 			topStatus := PartiallyFilled
 			if top.Qty.IsZero() {
 				topStatus = Filled
 			}
 
+			// Determine status of the incoming SELL order
 			orderStatus := PartiallyFilled
 			if order.Qty.IsZero() {
 				orderStatus = Filled
 			}
 
+			// write fill event for the incoming BUY order
 			fillCh <- OrderFill{
 				OrderID:      top.ID,
 				Pair:         ob.Pair,
 				Side:         top.Side,
-				OriginalQty:  top.Qty.Add(qty),
+				OriginalQty:  top.OriginalQty,
 				ExecutedQty:  qty,
 				RemainingQty: top.Qty,
 				Price:        top.Price,
@@ -223,11 +260,12 @@ func (ob *OrderBook) Match(order Order, tradeCh chan<- Trade, fillCh chan<- Orde
 				Timestamp:    now,
 			}
 
+			// write fill event for the matched SELL order (top of the ask heap)
 			fillCh <- OrderFill{
 				OrderID:      order.ID,
 				Pair:         ob.Pair,
 				Side:         order.Side,
-				OriginalQty:  order.Qty.Add(qty), // Reconstruct original qty
+				OriginalQty:  order.OriginalQty,
 				ExecutedQty:  qty,
 				RemainingQty: order.Qty,
 				Price:        top.Price,
@@ -236,15 +274,25 @@ func (ob *OrderBook) Match(order Order, tradeCh chan<- Trade, fillCh chan<- Orde
 				Timestamp:    now,
 			}
 
+			// If the BUY order still has remaining quantity, push it back to heap
 			if !top.Qty.IsZero() {
 				heap.Push(ob.bids, top)
+			} else {
+				// Remove fully filled order from the orders map
+				delete(ob.orders, top.ID)
 			}
 		}
+
+		// If SELL order is not fully filled, push the remaining quantity into asks heap
 		if !order.Qty.IsZero() {
 			heap.Push(ob.asks, &order)
+		} else {
+			// Remove fully filled order from the orders map
+			delete(ob.orders, order.ID)
 		}
 	}
 
+	// If no quantity was executed at all, mark the order as NEW
 	if order.Qty.Equal(originalQty) {
 		fillCh <- OrderFill{
 			OrderID:      order.ID,
@@ -259,6 +307,61 @@ func (ob *OrderBook) Match(order Order, tradeCh chan<- Trade, fillCh chan<- Orde
 			Timestamp:    now,
 		}
 	}
+
+	// closing channels in place where it gets written to prevent panic: write on closed channel
+	close(tradeCh)
+	close(fillCh)
+}
+
+func (ob *OrderBook) Cancel(orderId string, fillCh chan<- OrderFill) bool {
+	ob.mutex.Lock()
+	defer ob.mutex.Unlock()
+
+	order, exists := ob.orders[orderId]
+	if !exists {
+		return false
+	}
+
+	// order is already filled
+	if order.Qty.IsZero() {
+		return false
+	}
+
+	// delete from heap
+	switch order.Side {
+	case Buy:
+		ob.removeBidOrder(orderId)
+	case Sell:
+		ob.removeAskOrder(orderId)
+	}
+
+	now := time.Now().Unix()
+
+	// Calculate the executed quantity
+	// ExecutedQty = OriginalQty - CurrentQty(Qty)
+	executedQty := order.OriginalQty.Sub(order.Qty)
+
+	// send new fill uodate as a cancelled
+
+	delete(ob.orders, orderId)
+
+	fillCh <- OrderFill{
+		OrderID:      orderId,
+		Pair:         ob.Pair,
+		Side:         order.Side,
+		OriginalQty:  order.OriginalQty,
+		ExecutedQty:  executedQty,
+		RemainingQty: decimal.Zero, // Cancelled portion is no longer on book
+		Price:        order.Price,
+		FillPrice:    decimal.Zero,
+		Status:       Cancelled,
+		Timestamp:    now,
+	}
+
+	// closing channels in place where it gets written to prevent panic: write on closed channel
+	close(fillCh)
+
+	return true
 }
 
 // BestBid returns the highest bid price in the order book.
@@ -383,10 +486,34 @@ func (ob *OrderBook) GetAskDepth(depth int) []DepthLevel {
 	return levels
 }
 
+func (ob *OrderBook) removeBidOrder(orderId string) {
+	for i := 0; i < len(ob.bids.orderHeap); i++ {
+		if ob.bids.orderHeap[i].ID == orderId {
+			heap.Remove(ob.bids, i)
+		}
+	}
+}
+func (ob *OrderBook) removeAskOrder(orderId string) {
+	for i := 0; i < len(ob.asks.orderHeap); i++ {
+		if ob.asks.orderHeap[i].ID == orderId {
+			heap.Remove(ob.asks, i)
+		}
+	}
+}
+
 // min returns the smaller of two decimal values.
 func min(a, b decimal.Decimal) decimal.Decimal {
 	if a.LessThan(b) {
 		return a
 	}
 	return b
+}
+
+// GetOrderCount returns the number of active orders currently in the order book.
+// This includes both partially filled and new (unfilled) orders.
+// Fully filled and cancelled orders are not included.
+func (ob *OrderBook) GetOrderCount() int {
+	ob.mutex.Lock()
+	defer ob.mutex.Unlock()
+	return len(ob.orders)
 }
