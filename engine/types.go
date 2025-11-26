@@ -17,13 +17,13 @@ const (
 // Orders are the fundamental unit of trading in the engine and contain all
 // details needed for price-time priority matching.
 type Order struct {
-	ID            string          // Unique identifier for the order
-	Side          Side            // Direction of the order (Buy or Sell)
-	Price         decimal.Decimal // Price per unit for the order
-	OriginalQty   decimal.Decimal // Initially created order quantity. Is used to cancel not fully filled orders
-	Qty           decimal.Decimal // Quantity/amount to trade
-	Time          int64           // Unix timestamp when the order was created
-	OrderMetadata *OrderMetadata
+	ID          string          // Unique identifier for the order
+	Side        Side            // Direction of the order (Buy or Sell)
+	Price       decimal.Decimal // Price per unit for the order
+	OriginalQty decimal.Decimal // Initially created order quantity. Is used to cancel not fully filled orders
+	Qty         decimal.Decimal // Quantity/amount to trade
+	Time        int64           // Unix timestamp when the order was created
+	Metadata    *OrderMetadata
 }
 
 type OrderMetadata struct {
