@@ -23,6 +23,18 @@ type Order struct {
 	OriginalQty decimal.Decimal // Initially created order quantity. Is used to cancel not fully filled orders
 	Qty         decimal.Decimal // Quantity/amount to trade
 	Time        int64           // Unix timestamp when the order was created
+	Metadata    *OrderMetadata
+}
+
+type OrderMetadata struct {
+	Nullifier        string
+	AssetIDIn        decimal.Decimal
+	AmountIn         decimal.Decimal
+	AssetIDOut       decimal.Decimal
+	AmountOut        decimal.Decimal
+	MsgHash          string
+	Signature        string
+	IntentCommitment string
 }
 
 // Trade represents a successful match between two orders resulting in an execution.
