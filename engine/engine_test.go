@@ -263,23 +263,23 @@ func TestMultipleTradingPairs(t *testing.T) {
 }
 
 // TestGetNextTradeID tests trade ID generation
-func TestGetNextTradeID(t *testing.T) {
+func TestGetOrderID(t *testing.T) {
 	engine := NewEngine()
 
 	// Test sequential ID generation
-	id1 := engine.GetNextTradeID()
-	id2 := engine.GetNextTradeID()
-	id3 := engine.GetNextTradeID()
+	id1 := engine.GetNextOrderID()
+	id2 := engine.GetNextOrderID()
+	id3 := engine.GetNextOrderID()
 
-	if id1 != "T1" {
+	if id1 != "order-1" {
 		t.Errorf("Expected first ID 'T1', got %s", id1)
 	}
 
-	if id2 != "T2" {
+	if id2 != "order-2" {
 		t.Errorf("Expected second ID 'T2', got %s", id2)
 	}
 
-	if id3 != "T3" {
+	if id3 != "order-3" {
 		t.Errorf("Expected third ID 'T3', got %s", id3)
 	}
 }
@@ -299,7 +299,7 @@ func TestConcurrentTradeIDGeneration(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			for j := 0; j < numIDsPerGoroutine; j++ {
-				idChan <- engine.GetNextTradeID()
+				idChan <- engine.GetNextOrderID()
 			}
 		}()
 	}

@@ -134,11 +134,14 @@ func (ob *OrderBook) Match(order Order, tradeCh chan<- Trade, fillCh chan<- Orde
 
 			// Create a trade for matched quantity
 			tradeCh <- Trade{
-				Pair:        ob.Pair,
-				BuyOrderID:  order.ID,
-				SellOrderID: top.ID,
-				Price:       top.Price,
-				Qty:         qty,
+				Pair:         ob.Pair,
+				BuyOrderID:   order.ID,
+				SellOrderID:  top.ID,
+				Price:        top.Price,
+				Qty:          qty,
+				TakerOrderID: order.ID,
+				MakerOrderID: top.ID,
+				TakerSide:    order.Side,
 			}
 
 			// Update remaining quantities for both orders
@@ -222,11 +225,14 @@ func (ob *OrderBook) Match(order Order, tradeCh chan<- Trade, fillCh chan<- Orde
 
 			// Create a trade for matched quantity
 			tradeCh <- Trade{
-				Pair:        ob.Pair,
-				BuyOrderID:  top.ID,
-				SellOrderID: order.ID,
-				Price:       top.Price,
-				Qty:         qty,
+				Pair:         ob.Pair,
+				BuyOrderID:   top.ID,
+				SellOrderID:  order.ID,
+				Price:        top.Price,
+				Qty:          qty,
+				TakerOrderID: order.ID,
+				MakerOrderID: top.ID,
+				TakerSide:    order.Side,
 			}
 
 			// Update remaining quantities for both orders

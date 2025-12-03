@@ -69,7 +69,7 @@ type Engine struct {
 	DepthUpdates chan DepthUpdate       // Stream of order book depth snapshots
 	FillStream   chan OrderFill         // Stream of order fill events
 	tradeStats   map[string]*TradeStats // Trading statistics by pair
-	tradeCounter int64                  // Global trade counter for unique IDs
+	orderCounter int64                  // Global order counter for unique IDs
 }
 
 // NewEngine creates and initializes a new trading engine with default channel capacities.
@@ -90,7 +90,7 @@ func NewEngine() *Engine {
 		DepthUpdates: make(chan DepthUpdate, 100),
 		FillStream:   make(chan OrderFill, 1000),
 		tradeStats:   make(map[string]*TradeStats),
-		tradeCounter: 0,
+		orderCounter: 0,
 	}
 }
 
@@ -336,17 +336,18 @@ func (e *Engine) GetOrderBookDepth(pair string, depth int) *DepthUpdate {
 	}
 }
 
-// GetNextTradeID generates a unique identifier for trade events. Trade IDs are
+// GetNextOrderID generates a unique identifier for orders. Order IDs are
 // sequential and globally unique across all trading pairs.
 //
 // Returns:
-//   - Unique trade ID in format "T{number}" (e.g., "T1", "T2", "T123")
+//   - Unique trade ID in format "order-{number}" (e.g., "order-1", "order-2", "order-123")
 //
 // This method is thread-safe and ensures no duplicate trade IDs are generated
 // even under high concurrency.
-func (e *Engine) GetNextTradeID() string {
+func (e *Engine) GetNextOrderID() string {
+	// TODO replace state lock with atomic value
 	e.mutex.Lock()
 	defer e.mutex.Unlock()
-	e.tradeCounter++
-	return fmt.Sprintf("T%d", e.tradeCounter)
+	e.orderCounter++
+	return fmt.Sprintf("order-%d", e.orderCounter)
 }

@@ -45,6 +45,10 @@ type Trade struct {
 	SellOrderID string          // ID of the sell order involved in the trade
 	Price       decimal.Decimal // Execution price of the trade
 	Qty         decimal.Decimal // Quantity traded
+
+	TakerOrderID string // Incoming order
+	MakerOrderID string // Resting order in book)
+	TakerSide    Side   // Side
 }
 
 // PriceUpdate contains current best bid/ask prices and average price information
